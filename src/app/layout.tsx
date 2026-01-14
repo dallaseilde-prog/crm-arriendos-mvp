@@ -1,0 +1,39 @@
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import './globals.css'
+import Sidebar from '@/components/layout/Sidebar'
+import MobileNav from '@/components/layout/MobileNav'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+    title: 'CRM Arriendos - Gestión de Propiedades',
+    description: 'Sistema de gestión de arriendos para propiedades multifamiliares',
+}
+
+export default function RootLayout({
+    children,
+}: {
+    children: React.ReactNode
+}) {
+    return (
+        <html lang="es">
+            <body className={inter.className}>
+                <div className="flex min-h-screen">
+                    {/* Sidebar - Hidden on mobile */}
+                    <Sidebar />
+
+                    {/* Main content */}
+                    <main className="flex-1 lg:ml-64">
+                        {/* Mobile nav */}
+                        <MobileNav />
+
+                        <div className="p-4 md:p-6 lg:p-8 pt-20 lg:pt-8">
+                            {children}
+                        </div>
+                    </main>
+                </div>
+            </body>
+        </html>
+    )
+}

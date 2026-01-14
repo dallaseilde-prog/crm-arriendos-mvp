@@ -1,0 +1,32 @@
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+    content: [
+        './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/components/**/*.{js,ts,jsx,tsx,mdx}',
+        './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    ],
+    theme: {
+        extend: {
+            colors: {
+                // Estados
+                'success': '#22c55e',
+                'warning': '#f59e0b',
+                'danger': '#ef4444',
+                'info': '#3b82f6',
+                // Dark theme
+                'dark': {
+                    900: '#0f172a',
+                    800: '#1e293b',
+                    700: '#334155',
+                    600: '#475569',
+                }
+            },
+            fontFamily: {
+                sans: ['Inter', 'system-ui', 'sans-serif'],
+            },
+        },
+    },
+    plugins: [],
+}
+export default config
