@@ -44,25 +44,31 @@ export default function UnidadesPage() {
     const handleSave = async () => {
         if (!formData.nombre) return
 
-        if (editingUnit) {
-            const { error } = await supabase
-                .from('unidades')
-                .update(formData)
-                .eq('id', editingUnit.id)
+        try {
+            if (editingUnit) {
+                const { error } = await supabase
+                    .from('unidades')
+                    .update(formData)
+                    .eq('id', editingUnit.id)
 
-            if (error) console.error('Error updating unit:', error)
-        } else {
-            const { error } = await supabase
-                .from('unidades')
-                .insert([formData])
+                if (error) throw error
+            } else {
+                const { error } = await supabase
+                    .from('unidades')
+                    .insert([formData])
 
-            if (error) console.error('Error creating unit:', error)
+                if (error) throw error
+            }
+
+            await fetchUnits()
+            setShowForm(false)
+            setEditingUnit(null)
+            setFormData({ nombre: '', medidor_id: '', descripcion: '' })
+            alert(editingUnit ? 'Unidad actualizada' : 'Unidad creada')
+        } catch (error: any) {
+            console.error('Error saving unit:', error)
+            alert('Error al guardar: ' + error.message)
         }
-
-        fetchUnits()
-        setShowForm(false)
-        setEditingUnit(null)
-        setFormData({ nombre: '', medidor_id: '', descripcion: '' })
     }
 
     const handleEdit = (unit: Unit) => {

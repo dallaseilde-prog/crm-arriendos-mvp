@@ -68,9 +68,9 @@ export default function PagosPage() {
 
             if (contractsError) throw contractsError
             setContratos(contractsData || [])
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching payments:', error)
-            alert('Error al cargar datos: ' + error.message)
+            alert('Error al cargar datos: ' + (error.message || 'Error desconocido'))
         } finally {
             setLoading(false)
         }
@@ -94,9 +94,9 @@ export default function PagosPage() {
 
             if (error) throw error
             await fetchData()
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error confirming payment:', error)
-            alert('Error al confirmar: ' + error.message)
+            alert('Error al confirmar: ' + (error.message || 'Error desconocido'))
         }
     }
 
@@ -129,9 +129,9 @@ export default function PagosPage() {
             setShowForm(false)
             setNewPayment({ tipo: 'ingreso', contrato_id: '', categoria: 'arriendo', monto: 0, descripcion: '' })
             alert('Transacción registrada con éxito')
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error adding payment:', error)
-            alert('Error al guardar: ' + error.message)
+            alert('Error al guardar: ' + (error.message || 'Error desconocido'))
         }
     }
 

@@ -40,8 +40,9 @@ export default function InquilinosPage() {
 
             if (error) throw error
             setTenants(data || [])
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error fetching tenants:', error)
+            alert('Error al cargar inquilinos: ' + error.message)
         } finally {
             setLoading(false)
         }
@@ -78,8 +79,10 @@ export default function InquilinosPage() {
             setShowForm(false)
             setEditingTenant(null)
             setFormData({ nombre: '', telefono: '', email: '', documento_identidad: '', estado: 'prospecto' })
-        } catch (error) {
+            alert(editingTenant ? 'Inquilino actualizado con éxito' : 'Inquilino creado con éxito')
+        } catch (error: any) {
             console.error('Error saving tenant:', error)
+            alert('Error al guardar inquilino: ' + error.message)
         }
     }
 
