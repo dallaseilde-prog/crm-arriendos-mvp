@@ -1,15 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { Users, Plus, Edit2, Phone, Mail, Search, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Users, Plus, Edit2, Phone, Mail, Search, User, Loader2 } from 'lucide-react'
 import { Tenant, TenantStatus } from '@/types'
-
-const mockTenants: Tenant[] = [
-    { id: '1', nombre: 'Juan Pérez', telefono: '+56912345678', email: 'juan.perez@email.com', documento_identidad: '12.345.678-9', estado: 'activo', created_at: '' },
-    { id: '2', nombre: 'María García', telefono: '+56923456789', email: 'maria.garcia@email.com', documento_identidad: '23.456.789-0', estado: 'activo', created_at: '' },
-    { id: '3', nombre: 'Carlos López', telefono: '+56934567890', email: 'carlos.lopez@email.com', documento_identidad: '34.567.890-1', estado: 'activo', created_at: '' },
-    { id: '4', nombre: 'Ana Martínez', telefono: '+56945678901', email: 'ana.martinez@email.com', estado: 'prospecto', created_at: '' },
-]
+import { supabase } from '@/lib/supabase/client'
 
 const estadoConfig: Record<TenantStatus, { label: string; class: string }> = {
     activo: { label: 'Activo', class: 'badge-success' },
@@ -18,7 +12,8 @@ const estadoConfig: Record<TenantStatus, { label: string; class: string }> = {
 }
 
 export default function InquilinosPage() {
-    const [tenants, setTenants] = useState(mockTenants)
+    const [tenants, setTenants] = useState<Tenant[]>([])
+    const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState('')
     const [filter, setFilter] = useState<TenantStatus | 'todos'>('todos')
     const [showForm, setShowForm] = useState(false)
@@ -31,6 +26,27 @@ export default function InquilinosPage() {
         estado: 'prospecto' as TenantStatus,
     })
 
+    useEffect(() => {
+        fetchTenants()
+    }, [])
+
+    const fetchTenants = async () => {
+        setLoading(true)
+        try {
+            const { data, error } = await supabase
+                .from('inquilinos')
+                .select('*')
+                .order('created_at', { ascending: false })
+
+            if (error) throw error
+            setTenants(data || [])
+        } catch (error) {
+            console.error('Error fetching tenants:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const filteredTenants = tenants.filter(t => {
         const matchesSearch = t.nombre.toLowerCase().includes(search.toLowerCase()) ||
             t.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -39,25 +55,32 @@ export default function InquilinosPage() {
         return matchesSearch && t.estado === filter
     })
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!formData.nombre) return
 
-        if (editingTenant) {
-            setTenants(tenants.map(t =>
-                t.id === editingTenant.id ? { ...t, ...formData } : t
-            ))
-        } else {
-            const newTenant: Tenant = {
-                id: Date.now().toString(),
-                ...formData,
-                created_at: new Date().toISOString(),
-            }
-            setTenants([...tenants, newTenant])
-        }
+        try {
+            if (editingTenant) {
+                const { error } = await supabase
+                    .from('inquilinos')
+                    .update(formData)
+                    .eq('id', editingTenant.id)
 
-        setShowForm(false)
-        setEditingTenant(null)
-        setFormData({ nombre: '', telefono: '', email: '', documento_identidad: '', estado: 'prospecto' })
+                if (error) throw error
+            } else {
+                const { error } = await supabase
+                    .from('inquilinos')
+                    .insert([formData])
+
+                if (error) throw error
+            }
+
+            await fetchTenants()
+            setShowForm(false)
+            setEditingTenant(null)
+            setFormData({ nombre: '', telefono: '', email: '', documento_identidad: '', estado: 'prospecto' })
+        } catch (error) {
+            console.error('Error saving tenant:', error)
+        }
     }
 
     const handleEdit = (tenant: Tenant) => {
@@ -114,8 +137,8 @@ export default function InquilinosPage() {
                             key={f}
                             onClick={() => setFilter(f)}
                             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${filter === f
-                                    ? 'bg-info text-white'
-                                    : 'bg-dark-700 text-slate-400 hover:text-white'
+                                ? 'bg-info text-white'
+                                : 'bg-dark-700 text-slate-400 hover:text-white'
                                 }`}
                         >
                             {f === 'todos' ? 'Todos' : estadoConfig[f].label}
@@ -215,50 +238,57 @@ export default function InquilinosPage() {
             )}
 
             {/* Lista */}
-            <div className="grid gap-4 md:grid-cols-2">
-                {filteredTenants.map((tenant) => (
-                    <div key={tenant.id} className="card">
-                        <div className="flex items-start justify-between">
-                            <div className="flex items-start gap-3">
-                                <div className="w-12 h-12 bg-gradient-to-br from-info to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
-                                    {tenant.nombre.charAt(0)}
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2">
-                                        <h3 className="font-semibold text-white">{tenant.nombre}</h3>
-                                        <span className={estadoConfig[tenant.estado].class}>
-                                            {estadoConfig[tenant.estado].label}
-                                        </span>
+            {loading ? (
+                <div className="flex flex-col items-center justify-center py-20 card">
+                    <Loader2 className="w-12 h-12 text-info animate-spin mb-4" />
+                    <p className="text-slate-400">Cargando inquilinos desde Supabase...</p>
+                </div>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                    {filteredTenants.map((tenant) => (
+                        <div key={tenant.id} className="card">
+                            <div className="flex items-start justify-between">
+                                <div className="flex items-start gap-3">
+                                    <div className="w-12 h-12 bg-gradient-to-br from-info to-purple-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                                        {tenant.nombre.charAt(0)}
                                     </div>
-                                    <div className="mt-2 space-y-1">
-                                        {tenant.telefono && (
-                                            <a href={`tel:${tenant.telefono}`} className="flex items-center gap-2 text-sm text-slate-400 hover:text-info transition-colors">
-                                                <Phone className="w-3 h-3" />
-                                                {tenant.telefono}
-                                            </a>
-                                        )}
-                                        {tenant.email && (
-                                            <a href={`mailto:${tenant.email}`} className="flex items-center gap-2 text-sm text-slate-400 hover:text-info transition-colors">
-                                                <Mail className="w-3 h-3" />
-                                                {tenant.email}
-                                            </a>
-                                        )}
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <h3 className="font-semibold text-white">{tenant.nombre}</h3>
+                                            <span className={estadoConfig[tenant.estado].class}>
+                                                {estadoConfig[tenant.estado].label}
+                                            </span>
+                                        </div>
+                                        <div className="mt-2 space-y-1">
+                                            {tenant.telefono && (
+                                                <a href={`tel:${tenant.telefono}`} className="flex items-center gap-2 text-sm text-slate-400 hover:text-info transition-colors">
+                                                    <Phone className="w-3 h-3" />
+                                                    {tenant.telefono}
+                                                </a>
+                                            )}
+                                            {tenant.email && (
+                                                <a href={`mailto:${tenant.email}`} className="flex items-center gap-2 text-sm text-slate-400 hover:text-info transition-colors">
+                                                    <Mail className="w-3 h-3" />
+                                                    {tenant.email}
+                                                </a>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
+
+                                <button
+                                    onClick={() => handleEdit(tenant)}
+                                    className="p-2 text-slate-400 hover:text-white transition-colors"
+                                >
+                                    <Edit2 className="w-4 h-4" />
+                                </button>
                             </div>
-
-                            <button
-                                onClick={() => handleEdit(tenant)}
-                                className="p-2 text-slate-400 hover:text-white transition-colors"
-                            >
-                                <Edit2 className="w-4 h-4" />
-                            </button>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
-            {filteredTenants.length === 0 && (
+            {!loading && filteredTenants.length === 0 && (
                 <div className="card text-center py-12">
                     <User className="w-16 h-16 text-dark-600 mx-auto mb-4" />
                     <p className="text-slate-400">No se encontraron inquilinos</p>

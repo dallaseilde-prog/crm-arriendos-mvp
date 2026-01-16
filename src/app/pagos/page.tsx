@@ -1,30 +1,20 @@
 'use client'
 
-import { useState } from 'react'
-import { DollarSign, Check, Plus, Receipt, Calendar, User, Home, Search } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { DollarSign, Check, Plus, Receipt, Calendar, User, Home, Search, Loader2 } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { Transaction } from '@/types'
 
-interface Payment {
-    id: string
-    inquilino: string
-    unidad: string
-    concepto: 'arriendo' | 'luz' | 'deposito' | 'otro'
-    monto: number
-    fecha: string
-    confirmado: boolean
+interface TransactionWithRelations extends Transaction {
+    inquilino_nombre?: string
+    unidad_nombre?: string
 }
 
-const mockPayments: Payment[] = [
-    { id: '1', inquilino: 'Juan Pérez', unidad: 'Habitación 1', concepto: 'arriendo', monto: 450000, fecha: '2024-01-05', confirmado: true },
-    { id: '2', inquilino: 'Juan Pérez', unidad: 'Habitación 1', concepto: 'luz', monto: 32000, fecha: '2024-01-05', confirmado: true },
-    { id: '3', inquilino: 'María García', unidad: 'Habitación 2', concepto: 'arriendo', monto: 450000, fecha: '2024-01-08', confirmado: true },
-    { id: '4', inquilino: 'Carlos López', unidad: 'Apartamento A', concepto: 'arriendo', monto: 550000, fecha: '2024-01-10', confirmado: false },
-]
-
-const conceptoConfig = {
+const conceptoConfig: any = {
     arriendo: { label: 'Arriendo', color: 'text-success', bg: 'bg-success/20' },
     luz: { label: 'Electricidad', color: 'text-warning', bg: 'bg-warning/20' },
     deposito: { label: 'Depósito', color: 'text-info', bg: 'bg-info/20' },
-    otro: { label: 'Otro', color: 'text-slate-400', bg: 'bg-slate-400/20' },
+    otros: { label: 'Otro', color: 'text-slate-400', bg: 'bg-slate-400/20' },
 }
 
 function formatCurrency(amount: number): string {
@@ -36,45 +26,95 @@ function formatCurrency(amount: number): string {
 }
 
 export default function PagosPage() {
-    const [payments, setPayments] = useState(mockPayments)
+    const [payments, setPayments] = useState<TransactionWithRelations[]>([])
+    const [loading, setLoading] = useState(true)
     const [showForm, setShowForm] = useState(false)
     const [search, setSearch] = useState('')
+    const [contratos, setContratos] = useState<any[]>([])
 
     // Nuevo pago form
     const [newPayment, setNewPayment] = useState({
-        inquilino: '',
-        unidad: '',
-        concepto: 'arriendo' as const,
+        contrato_id: '',
+        categoria: 'arriendo',
         monto: 0,
+        descripcion: '',
     })
 
-    const filteredPayments = payments.filter(p =>
-        p.inquilino.toLowerCase().includes(search.toLowerCase()) ||
-        p.unidad.toLowerCase().includes(search.toLowerCase())
-    )
+    useEffect(() => {
+        fetchData()
+    }, [])
 
-    const handleConfirmPayment = (id: string) => {
-        setPayments(payments.map(p =>
-            p.id === id ? { ...p, confirmado: true } : p
-        ))
+    const fetchData = async () => {
+        setLoading(true)
+        try {
+            // 1. Fetch transactions
+            const { data: transData, error: transError } = await supabase
+                .from('vista_transacciones_completas')
+                .select('*')
+                .eq('tipo', 'ingreso')
+
+            if (transError) throw transError
+            setPayments(transData || [])
+
+            // 2. Fetch contracts for the form
+            const { data: contractsData, error: contractsError } = await supabase
+                .from('vista_contratos_completos')
+                .select('id, inquilino_nombre, unidad_nombre')
+                .eq('estado_activo', true)
+
+            if (contractsError) throw contractsError
+            setContratos(contractsData || [])
+        } catch (error) {
+            console.error('Error fetching payments:', error)
+        } finally {
+            setLoading(false)
+        }
     }
 
-    const handleAddPayment = () => {
-        if (!newPayment.inquilino || !newPayment.monto) return
+    const filteredPayments = payments.filter(p =>
+        (p.inquilino_nombre?.toLowerCase() || '').includes(search.toLowerCase()) ||
+        (p.unidad_nombre?.toLowerCase() || '').includes(search.toLowerCase()) ||
+        (p.descripcion?.toLowerCase() || '').includes(search.toLowerCase())
+    )
 
-        const payment: Payment = {
-            id: Date.now().toString(),
-            ...newPayment,
-            fecha: new Date().toISOString().split('T')[0],
-            confirmado: true,
+    const handleConfirmPayment = async (id: string) => {
+        try {
+            const { error } = await supabase
+                .from('transacciones')
+                .update({ confirmado: true })
+                .eq('id', id)
+
+            if (error) throw error
+            await fetchData()
+        } catch (error) {
+            console.error('Error confirming payment:', error)
         }
+    }
 
-        setPayments([payment, ...payments])
-        setShowForm(false)
-        setNewPayment({ inquilino: '', unidad: '', concepto: 'arriendo', monto: 0 })
+    const handleAddPayment = async () => {
+        if (!newPayment.contrato_id || !newPayment.monto) return
 
-        // Aquí se generaría el recibo digital
-        alert('Pago registrado. Recibo generado.')
+        try {
+            const { error } = await supabase
+                .from('transacciones')
+                .insert([{
+                    tipo: 'ingreso',
+                    categoria: newPayment.categoria,
+                    monto: newPayment.monto,
+                    descripcion: newPayment.descripcion,
+                    contrato_id: newPayment.contrato_id,
+                    fecha: new Date().toISOString().split('T')[0],
+                    confirmado: true
+                }])
+
+            if (error) throw error
+
+            await fetchData()
+            setShowForm(false)
+            setNewPayment({ contrato_id: '', categoria: 'arriendo', monto: 0, descripcion: '' })
+        } catch (error) {
+            console.error('Error adding payment:', error)
+        }
     }
 
     const totalMes = payments.reduce((sum, p) => sum + p.monto, 0)
@@ -104,7 +144,7 @@ export default function PagosPage() {
             {/* Stats */}
             <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="stat-card">
-                    <p className="text-slate-400 text-sm">Total del Mes</p>
+                    <p className="text-slate-400 text-sm">Total Histórico</p>
                     <p className="stat-value text-success">{formatCurrency(totalMes)}</p>
                 </div>
                 <div className="stat-card">
@@ -127,31 +167,33 @@ export default function PagosPage() {
                             <div>
                                 <label className="block text-sm text-slate-400 mb-2">
                                     <User className="w-4 h-4 inline mr-1" />
-                                    Inquilino
+                                    Contrato (Inquilino - Unidad)
                                 </label>
                                 <select
-                                    value={newPayment.inquilino}
-                                    onChange={(e) => setNewPayment({ ...newPayment, inquilino: e.target.value, unidad: e.target.value === 'Juan Pérez' ? 'Habitación 1' : 'Habitación 2' })}
+                                    value={newPayment.contrato_id}
+                                    onChange={(e) => setNewPayment({ ...newPayment, contrato_id: e.target.value })}
                                     className="input-field"
                                 >
-                                    <option value="">Seleccionar...</option>
-                                    <option value="Juan Pérez">Juan Pérez</option>
-                                    <option value="María García">María García</option>
-                                    <option value="Carlos López">Carlos López</option>
+                                    <option value="">Seleccionar contrato...</option>
+                                    {contratos.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.inquilino_nombre} - {c.unidad_nombre}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
                             <div>
-                                <label className="block text-sm text-slate-400 mb-2">Concepto</label>
+                                <label className="block text-sm text-slate-400 mb-2">Categoría</label>
                                 <select
-                                    value={newPayment.concepto}
-                                    onChange={(e) => setNewPayment({ ...newPayment, concepto: e.target.value as any })}
+                                    value={newPayment.categoria}
+                                    onChange={(e) => setNewPayment({ ...newPayment, categoria: e.target.value })}
                                     className="input-field"
                                 >
                                     <option value="arriendo">Arriendo</option>
                                     <option value="luz">Electricidad</option>
                                     <option value="deposito">Depósito</option>
-                                    <option value="otro">Otro</option>
+                                    <option value="otros">Otro</option>
                                 </select>
                             </div>
 
@@ -163,6 +205,17 @@ export default function PagosPage() {
                                     onChange={(e) => setNewPayment({ ...newPayment, monto: Number(e.target.value) })}
                                     className="input-field"
                                     placeholder="450000"
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-slate-400 mb-2">Descripción (Opcional)</label>
+                                <input
+                                    type="text"
+                                    value={newPayment.descripcion}
+                                    onChange={(e) => setNewPayment({ ...newPayment, descripcion: e.target.value })}
+                                    className="input-field"
+                                    placeholder="Mes de Enero..."
                                 />
                             </div>
                         </div>
@@ -179,7 +232,7 @@ export default function PagosPage() {
                                 className="btn-success flex-1 flex items-center justify-center gap-2"
                             >
                                 <Receipt className="w-4 h-4" />
-                                Registrar y Generar Recibo
+                                Registrar Pago
                             </button>
                         </div>
                     </div>
@@ -193,7 +246,7 @@ export default function PagosPage() {
                     type="text"
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
-                    placeholder="Buscar por inquilino o unidad..."
+                    placeholder="Buscar por inquilino, unidad o descripción..."
                     className="input-field pl-12"
                 />
             </div>
@@ -202,58 +255,73 @@ export default function PagosPage() {
             <div className="card">
                 <h2 className="text-lg font-semibold text-white mb-4">Historial de Pagos</h2>
 
-                <div className="space-y-3">
-                    {filteredPayments.map((payment) => {
-                        const config = conceptoConfig[payment.concepto]
-                        return (
-                            <div
-                                key={payment.id}
-                                className={`p-4 rounded-lg flex items-center justify-between gap-4 ${payment.confirmado ? 'bg-dark-800' : 'bg-warning/10 border border-warning/30'}`}
-                            >
-                                <div className="flex items-center gap-4">
-                                    <div className={`p-2 rounded-lg ${config.bg}`}>
-                                        {payment.concepto === 'arriendo' ? (
-                                            <Home className={`w-5 h-5 ${config.color}`} />
-                                        ) : payment.concepto === 'luz' ? (
-                                            <DollarSign className={`w-5 h-5 ${config.color}`} />
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-20">
+                        <Loader2 className="w-12 h-12 text-info animate-spin mb-4" />
+                        <p className="text-slate-400">Cargando pagos desde Supabase...</p>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {filteredPayments.map((payment) => {
+                            const config = conceptoConfig[payment.categoria] || conceptoConfig.otros
+                            return (
+                                <div
+                                    key={payment.id}
+                                    className={`p-4 rounded-lg flex items-center justify-between gap-4 ${payment.confirmado ? 'bg-dark-800' : 'bg-warning/10 border border-warning/30'}`}
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-2 rounded-lg ${config.bg}`}>
+                                            {payment.categoria === 'arriendo' ? (
+                                                <Home className={`w-5 h-5 ${config.color}`} />
+                                            ) : (
+                                                <DollarSign className={`w-5 h-5 ${config.color}`} />
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="font-medium text-white">{payment.inquilino_nombre || 'N/A'}</p>
+                                            <p className="text-sm text-slate-400">
+                                                {payment.unidad_nombre || 'Sin unidad'} • {config.label}
+                                            </p>
+                                            {payment.descripcion && (
+                                                <p className="text-xs text-slate-400 italic mt-1">{payment.descripcion}</p>
+                                            )}
+                                            <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
+                                                <Calendar className="w-3 h-3" />
+                                                {new Date(payment.fecha).toLocaleDateString('es-CL')}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="text-right">
+                                        <p className="text-xl font-bold text-success">
+                                            {formatCurrency(payment.monto)}
+                                        </p>
+                                        {payment.confirmado ? (
+                                            <span className="badge-success text-xs">
+                                                <Check className="w-3 h-3 mr-1" />
+                                                Confirmado
+                                            </span>
                                         ) : (
-                                            <DollarSign className={`w-5 h-5 ${config.color}`} />
+                                            <button
+                                                onClick={() => handleConfirmPayment(payment.id)}
+                                                className="text-xs text-warning hover:text-white transition-colors"
+                                            >
+                                                Confirmar pago
+                                            </button>
                                         )}
                                     </div>
-                                    <div>
-                                        <p className="font-medium text-white">{payment.inquilino}</p>
-                                        <p className="text-sm text-slate-400">
-                                            {payment.unidad} • {config.label}
-                                        </p>
-                                        <p className="text-xs text-slate-500 flex items-center gap-1 mt-1">
-                                            <Calendar className="w-3 h-3" />
-                                            {new Date(payment.fecha).toLocaleDateString('es-CL')}
-                                        </p>
-                                    </div>
                                 </div>
+                            )
+                        })}
 
-                                <div className="text-right">
-                                    <p className="text-xl font-bold text-success">
-                                        {formatCurrency(payment.monto)}
-                                    </p>
-                                    {payment.confirmado ? (
-                                        <span className="badge-success text-xs">
-                                            <Check className="w-3 h-3 mr-1" />
-                                            Confirmado
-                                        </span>
-                                    ) : (
-                                        <button
-                                            onClick={() => handleConfirmPayment(payment.id)}
-                                            className="text-xs text-warning hover:text-white transition-colors"
-                                        >
-                                            Confirmar pago
-                                        </button>
-                                    )}
-                                </div>
+                        {filteredPayments.length === 0 && (
+                            <div className="text-center py-12">
+                                <DollarSign className="w-16 h-16 text-dark-600 mx-auto mb-4" />
+                                <p className="text-slate-400">No se encontraron pagos</p>
                             </div>
-                        )
-                    })}
-                </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )
