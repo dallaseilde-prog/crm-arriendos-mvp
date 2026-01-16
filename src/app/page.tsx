@@ -45,16 +45,16 @@ export default function Dashboard() {
             if (transError) throw transError
 
             const totalIncome = trans
-                .filter(t => t.tipo === 'ingreso' && t.confirmado)
-                .reduce((sum, t) => sum + t.monto, 0)
+                .filter((t: any) => t.tipo === 'ingreso' && t.confirmado)
+                .reduce((sum: number, t: any) => sum + t.monto, 0)
 
             const pendingPayments = trans
-                .filter(t => t.confirmado === false)
-                .reduce((sum, t) => sum + t.monto, 0)
+                .filter((t: any) => t.confirmado === false)
+                .reduce((sum: number, t: any) => sum + t.monto, 0)
 
             const electricityCollected = trans
-                .filter(t => t.tipo === 'ingreso' && t.categoria === 'luz')
-                .reduce((sum, t) => sum + t.monto, 0)
+                .filter((t: any) => t.tipo === 'ingreso' && t.categoria === 'luz')
+                .reduce((sum: number, t: any) => sum + t.monto, 0)
 
             // 3. Obtener contratos para ocupación (simplificado para el dashboard)
             const { data: contracts, error: contractsError } = await supabase
@@ -65,8 +65,8 @@ export default function Dashboard() {
             if (contractsError) throw contractsError
 
             // Mappear unidades con su estado actual
-            const mappedUnits: UnitWithStatus[] = (units || []).map(u => {
-                const contract = contracts?.find(c => c.unidad_id === u.id)
+            const mappedUnits: UnitWithStatus[] = (units || []).map((u: any) => {
+                const contract = contracts?.find((c: any) => c.unidad_id === u.id)
                 return {
                     ...u,
                     tenant: contract?.inquilino_nombre || undefined,
@@ -80,9 +80,9 @@ export default function Dashboard() {
                 pendingPayments,
                 electricityCollected,
                 electricityPaid: 118000, // Mock for now or could fetch from bills
-                occupiedUnits: mappedUnits.filter(u => u.tenant).length,
+                occupiedUnits: mappedUnits.filter((u: any) => u.tenant).length,
                 totalUnits: mappedUnits.length,
-                expiringContracts: contracts?.filter(c => c.dias_restantes < 30).length || 0,
+                expiringContracts: contracts?.filter((c: any) => c.dias_restantes < 30).length || 0,
             })
 
         } catch (error) {

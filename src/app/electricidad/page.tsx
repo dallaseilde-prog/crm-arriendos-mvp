@@ -33,7 +33,7 @@ export default function ElectricidadPage() {
             if (unitsError) throw unitsError
 
             // 2. Para cada unidad, buscar su última lectura
-            const lecturasIniciales = await Promise.all((unitsData || []).map(async (u) => {
+            const lecturasIniciales = await Promise.all((unitsData || []).map(async (u: any) => {
                 const { data: lastReading, error: readError } = await supabase
                     .from('lecturas_luz')
                     .select('lectura_kwh')
