@@ -31,6 +31,10 @@ export default function InquilinosPage() {
     }, [])
 
     const fetchTenants = async () => {
+        if (!supabase) {
+            console.error('Supabase client not initialized')
+            return
+        }
         setLoading(true)
         try {
             const { data, error } = await supabase
@@ -58,6 +62,10 @@ export default function InquilinosPage() {
 
     const handleSave = async () => {
         if (!formData.nombre) return
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos (faltan variables de entorno)')
+            return
+        }
 
         try {
             if (editingTenant) {
