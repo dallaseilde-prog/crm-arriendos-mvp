@@ -22,6 +22,11 @@ export default function UnidadesPage() {
     }, [])
 
     const fetchUnits = async () => {
+        if (!supabase) {
+            console.error('Supabase client not initialized')
+            setLoading(false)
+            return
+        }
         setLoading(true)
         const { data, error } = await supabase
             .from('unidades')
@@ -43,6 +48,10 @@ export default function UnidadesPage() {
 
     const handleSave = async () => {
         if (!formData.nombre) return
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos')
+            return
+        }
 
         try {
             if (editingUnit) {
@@ -82,6 +91,7 @@ export default function UnidadesPage() {
     }
 
     const handleToggleActive = async (unit: Unit) => {
+        if (!supabase) return
         const { error } = await supabase
             .from('unidades')
             .update({ activa: !unit.activa })

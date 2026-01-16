@@ -22,6 +22,10 @@ export default function ElectricidadPage() {
     }, [])
 
     const fetchData = async () => {
+        if (!supabase) {
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             // 1. Obtener unidades activas
@@ -81,6 +85,10 @@ export default function ElectricidadPage() {
 
     const handleGenerarCargos = async () => {
         if (!resultado) return
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos')
+            return
+        }
         setSaving(true)
         setErrors([])
 

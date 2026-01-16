@@ -49,6 +49,11 @@ export default function PagosPage() {
     }, [])
 
     const fetchData = async () => {
+        if (!supabase) {
+            console.error('Supabase client not initialized')
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             // 1. Fetch transactions
@@ -86,6 +91,10 @@ export default function PagosPage() {
     })
 
     const handleConfirmPayment = async (id: string) => {
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos')
+            return
+        }
         try {
             const { error } = await supabase
                 .from('transacciones')
@@ -107,6 +116,11 @@ export default function PagosPage() {
         }
         if (!newPayment.monto || newPayment.monto <= 0) {
             alert('Ingrese un monto válido')
+            return
+        }
+
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos')
             return
         }
 

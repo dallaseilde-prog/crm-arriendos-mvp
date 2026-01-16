@@ -54,6 +54,7 @@ export default function ContratosPage() {
     }, [])
 
     const fetchInitialData = async () => {
+        if (!supabase) return
         try {
             const { data: unitsData } = await supabase.from('unidades').select('*').eq('activa', true)
             const { data: tenantsData } = await supabase.from('inquilinos').select('*').eq('estado', 'activo')
@@ -65,6 +66,10 @@ export default function ContratosPage() {
     }
 
     const fetchContracts = async () => {
+        if (!supabase) {
+            setLoading(false)
+            return
+        }
         setLoading(true)
         try {
             const { data, error } = await supabase
@@ -84,6 +89,11 @@ export default function ContratosPage() {
     const handleSave = async () => {
         if (!formData.inquilino_id || !formData.unidad_id || !formData.fecha_inicio || !formData.fecha_fin) {
             alert('Por favor complete todos los campos obligatorios.')
+            return
+        }
+
+        if (!supabase) {
+            alert('Error: No hay conexión con la base de datos')
             return
         }
 
